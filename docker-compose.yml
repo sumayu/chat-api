@@ -1,0 +1,36 @@
+﻿services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    image: ghcr.io/pressly/goose:latest
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations
+    command: >
+      -dir /migrations postgres
+      "host=db user=app password=app dbname=app sslmode=disable"
+      up
+
+  api:
+    build: .
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_DSN: "host=db user=app password=app dbname=app sslmode=disable"
+    ports:
+      - "8080:8080"
